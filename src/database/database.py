@@ -6,6 +6,7 @@ import logging
 load_dotenv()
 
 class DatabaseManagerPostgreSQL:
+    # TODO - verificar o cpf_raw, e ve oque está acontecendo por que não ta inserindo a lista de resultados
     def __init__(self):
         self.logger = logging.getLogger("RoAutomation")
         self.pool = None
