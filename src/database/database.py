@@ -28,10 +28,14 @@ class DatabaseManagerPostgreSQL:
         try:
             async with self.pool.acquire() as connection:
                 query = """
-                    SELECT cpf_formatado, cpf_raw
-                    FROM spreed.ro
-                    WHERE has_filter = FALSE OR has_filter IS NULL
-                    LIMIT $1;
+                SELECT 
+                    regexp_replace(cpf, '(\\d{3})(\\d{3})(\\d{3})(\\d{2})', '\\1.\\2.\\3-\\4') AS cpf_formatado,
+                    cpf AS cpf_raw
+                FROM 
+                    spreed.ro 
+                WHERE 
+                    has_filter = FALSE
+                LIMIT $1;
                 """
                 rows = await connection.fetch(query, batch_size)
                 return [
@@ -48,15 +52,9 @@ class DatabaseManagerPostgreSQL:
         try:
             async with self.pool.acquire() as connection:
                 query = """
-                    INSERT INTO spreed.ro_results (
-                        nome, cpf, margem_disponivel, margem_cartao, margem_cartao_beneficio, created_at
+                    INSERT INTO spreed.result_search_ro (
+                        name, cpf_search, margem_disponivel, margem_cartao, margem_cartao_beneficio, created_at
                     ) VALUES ($1, $2, $3, $4, $5, NOW())
-                    ON CONFLICT (cpf) DO UPDATE 
-                    SET nome = EXCLUDED.nome,
-                        margem_disponivel = EXCLUDED.margem_disponivel,
-                        margem_cartao = EXCLUDED.margem_cartao,
-                        margem_cartao_beneficio = EXCLUDED.margem_cartao_beneficio,
-                        updated_at = NOW();
                 """
                 await connection.execute(
                     query,
