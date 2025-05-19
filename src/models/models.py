@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 
-class SearchRo(BaseModel):
+class ResultSearchRo(BaseModel):
     nome: str
     matricula: str
     cpf: str
