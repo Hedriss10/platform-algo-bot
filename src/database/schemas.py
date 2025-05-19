@@ -14,7 +14,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class ResultSearchRo(Base):
+class SearchRo(Base):
     __tablename__ = "ro"
     __table_args__ = {'schema': 'spreed'}
 
@@ -51,3 +51,22 @@ class ResultSearchRo(Base):
     def __repr__(self):
         return f"Registred sucessfully: {self.id}"
     
+
+class ResultSearchRo(Base):
+    __tablename__ = "result_search_ro"
+    __table_args__ = {'schema': 'spreed'}
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(225))
+    matricula: Mapped[str] = mapped_column(String(100))
+    cpf: Mapped[str] = mapped_column(String(30))
+    cargo: Mapped[str] = mapped_column(String(225))
+    lotacao: Mapped[str] = mapped_column(String(255))
+    classificacao: Mapped[str] = mapped_column(String(255))
+    margem_disponivel: Mapped[str] = mapped_column(String(30))
+    margem_cartao: Mapped[str] = mapped_column(String(30))
+    margem_cartao_beneficio: Mapped[str] = mapped_column(String(30))
+    
+    
+    def __repr__(self):
+        return f"Registred result search ro sucessfully: {self.id}"

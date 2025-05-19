@@ -3,7 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import sessionmaker
-from src.database.schemas import ResultSearchRo
+from src.database.schemas import SearchRo
 
 load_dotenv()
 
@@ -63,14 +63,14 @@ class InjectDataBaseManager:
 
         df.rename(columns=rename_map, inplace=True)
 
-        valid_columns = set(c.name for c in ResultSearchRo.__table__.columns if c.name != "id")
+        valid_columns = set(c.name for c in SearchRo.__table__.columns if c.name != "id")
         records = [
             {k: v for k, v in row.items() if k in valid_columns}
             for row in df.to_dict(orient="records")
         ]
         try:
             with engine.begin() as conn:
-                conn.execute(insert(ResultSearchRo), records)
+                conn.execute(insert(SearchRo), records)
             print(f"{len(records)} registros inseridos com sucesso.")
         except Exception as e:
             print("Erro ao inserir dados:", e)
