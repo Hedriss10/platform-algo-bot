@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import sessionmaker
 from src.database.schemas import ResultSearchRo
 
@@ -12,18 +12,22 @@ engine = create_engine(DATABASE_URL, connect_args={"options": "-csearch_path=spr
 Session = sessionmaker(bind=engine)
 
 class InjectDataBaseManager:
-
+    
     def __init__(self, file: str) -> None:
         self.file = file
-
+    
     def inject_data_base(self):
+        print("Lendo arquivo CSV...")
         df = pd.read_csv(self.file, sep=";", dtype=str, encoding="latin-1")
-        df = df.where(pd.notnull(df), None)  # Converte NaN para None
+        
+        df = df.where(pd.notnull(df), None)
 
         df["DATA_NASCIMENTO"] = pd.to_datetime(
             df["DATA_NASCIMENTO"], errors="coerce", dayfirst=True
         )
-        df["DATA_NASCIMENTO"] = df["DATA_NASCIMENTO"].apply(lambda x: x.date() if pd.notnull(x) else None)
+        df["DATA_NASCIMENTO"] = df["DATA_NASCIMENTO"].apply(
+            lambda x: x.date() if pd.notnull(x) else None
+        )
 
         df["IDADE"] = pd.to_numeric(df["IDADE"], errors="coerce")
 
@@ -58,24 +62,20 @@ class InjectDataBaseManager:
         }
 
         df.rename(columns=rename_map, inplace=True)
-        if "idade" in df.columns:
-            df["idade"] = df["idade"].astype(float)
 
-        records = [ResultSearchRo(**row) for row in df.to_dict(orient="records")]
-
-        session = Session()
+        valid_columns = set(c.name for c in ResultSearchRo.__table__.columns if c.name != "id")
+        records = [
+            {k: v for k, v in row.items() if k in valid_columns}
+            for row in df.to_dict(orient="records")
+        ]
         try:
-            session.bulk_save_objects(records)
-            session.commit()
+            with engine.begin() as conn:
+                conn.execute(insert(ResultSearchRo), records)
             print(f"{len(records)} registros inseridos com sucesso.")
         except Exception as e:
-            session.rollback()
             print("Erro ao inserir dados:", e)
-        finally:
-            session.close()
-
 
 if __name__ == "__main__":
-    filepath = "/Users/hedrispereira/temp/platform-algo-bot/data/data.csv"
+    filepath = "" # file path to csv
     manager = InjectDataBaseManager(filepath)
     manager.inject_data_base()
