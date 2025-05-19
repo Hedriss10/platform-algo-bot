@@ -18,3 +18,5 @@ wsproto==1.2.0
 SQLAlchemy==2.0.41
 fastapi==0.115.12
 fastapi-cli==0.0.7
+pandas==2.2.3
+psycopg2==2.9.10
