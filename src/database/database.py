@@ -76,7 +76,7 @@ class DatabaseManagerPostgreSQL:
                 query = """
                     UPDATE spreed.ro
                     SET has_filter = TRUE
-                    WHERE cpf_raw = $1;
+                    WHERE cpf = $1;
                 """
                 await connection.execute(query, cpf_raw)
                 self.logger.info(f"has_filter atualizado para CPF {cpf_raw}")

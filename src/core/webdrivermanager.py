@@ -210,6 +210,7 @@ class WebDriverManagerRo:
         try:
             self.logger.info("Extraindo dados da tabela...")
             modal = await self.wait_and_find(By.CSS_SELECTOR, "div.q-dialog", timeout=5)
+
             try:
                 table = modal.find_element(
                     By.CSS_SELECTOR, 'table[cellspacing="0"][cellpadding="0"]'
@@ -219,6 +220,7 @@ class WebDriverManagerRo:
                 self.logger.info("Tabela não encontrada ou não carregada no modal.")
                 return {"headers": [], "rows": []}
 
+            # Coleta os headers
             headers = []
             header_elements = table.find_elements(
                 By.CSS_SELECTOR, 'thead th:not([style*="display: none"])'
@@ -228,33 +230,36 @@ class WebDriverManagerRo:
                 if text:
                     headers.append(text)
 
+            self.logger.info(f"Headers detectados: {headers}")
+
             rows = []
             row_containers = table.find_elements(
                 By.XPATH,
                 './/tbody//tr[not(contains(@style,"display: none")) and not(.//td[contains(text(), "Nenhum registro encontrado")])]',
             )
             for row in row_containers:
-                row_data = {}
                 cells = row.find_elements(By.CSS_SELECTOR, 'td:not([style*="display: none"])')
-                for i, cell in enumerate(cells):
-                    if i < len(headers):
-                        try:
-                            row_data[headers[i]] = cell.text.strip()
-                        except Exception as e:
-                            self.logger.warning(f"Erro ao ler célula {i}: {str(e)}")
-                            row_data[headers[i]] = ""
-                
+                row_values = [cell.text.strip() for cell in cells]
+
+                if len(row_values) != len(headers):
+                    self.logger.warning(
+                        f"Número de células ({len(row_values)}) não bate com headers ({len(headers)}): {row_values}"
+                    )
+                    continue  # ou ajustar manualmente conforme necessário
+
+                row_data = dict(zip(headers, row_values))
+
                 if row_data.get("Margem disponível") == "Sem Margem" or row_data.get("Margem Cartão") == "Sem Margem":
                     self.logger.info(f"Ignorando linha com matrícula {row_data.get('Matricula')} por conter 'Sem Margem'")
                     continue
-                
-                if row_data:
-                    rows.append(row_data)
+
+                rows.append(row_data)
 
             self.logger.info(f"Encontrados {len(rows)} registros válidos na tabela")
             if rows:
                 self.logger.info(f"Dados extraídos: {rows}")
             return {"headers": headers, "rows": rows}
+
         except Exception as e:
             self.logger.error(f"Erro ao extrair dados da tabela: {str(e)}")
             return {"headers": [], "rows": []}
