@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+import uuid
 from typing import Dict
 
 from dotenv import load_dotenv
@@ -34,8 +35,9 @@ driver_logger = LoggerWebDriverManager(logger=logger)
 
 
 class WebDriverManager:
+    
     def __init__(self):
-        user_data_dir = tempfile.mkdtemp()
+        user_data_dir = tempfile.mkdtemp(prefix=f"selenium_{uuid.uuid4()}_")
         options = Options()
         options.add_argument("--start-maximized")
         options.add_argument("--disable-infobars")
@@ -44,18 +46,20 @@ class WebDriverManager:
         options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--headless")  # Descomentar para produção
+        options.add_argument("--no-sandbox")
+        options.add_argument("--headless")  # Descomentar em produção
 
         self.driver = Chrome(options=options)
         self.driver.set_page_load_timeout(30)
         self.driver.implicitly_wait(15)
-        driver_logger.register_logger(driver=self.driver)  # register logs
+        driver_logger.register_logger(driver=self.driver)
+    
 
 
 class PageObject(WebDriverManager):
     def __init__(self):
         super().__init__()
-
+    
     def extract_server_data(self, card) -> Dict:
         try:
             card = WaitHelper.wait_for_element(
@@ -137,6 +141,7 @@ class PageObject(WebDriverManager):
         try:
             driver_logger.logger.info("Login started")
             self.driver.get(URL_RO)
+            self.create_driver().get(URL_RO)
             user = WaitHelper.wait_for_element(
                 self.driver, By.NAME, locator="usuario", timeout=10
             )
