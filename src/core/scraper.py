@@ -44,7 +44,7 @@ class WebDriverManager:
         options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--headless")  # Descomentar para produção
+        # options.add_argument("--headless")  # Descomentar para produção
 
         self.driver = Chrome(options=options)
         self.driver.set_page_load_timeout(30)
