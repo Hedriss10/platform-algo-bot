@@ -77,6 +77,8 @@ class ScrapePoolExecute:
                 f"Error update_has_filter_cpf with cpfs: {str(e)}"
             )
             raise
+        finally:
+            db.close()
 
     def scrpaer_pool(self):
         try:
@@ -97,6 +99,9 @@ class ScrapePoolExecute:
         except Exception as e:
             driver_logger.logger.error(f"Error scrpaer_pool with cpfs: {str(e)}")
             raise
+        
+        finally:
+            db_session.close()
 
     def run(self):
         try:
