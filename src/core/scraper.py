@@ -1,6 +1,7 @@
 # src/core/scraper.py
 
 import os
+import tempfile
 from typing import Dict
 
 from dotenv import load_dotenv
@@ -31,6 +32,7 @@ PASSWORD_RO = os.getenv("PASSWORD_RO")
 logger = setup_logger()
 driver_logger = LoggerWebDriverManager(logger=logger)
 
+user_data_dir = tempfile.mkdtemp()
 
 class WebDriverManager:
     def __init__(self):
@@ -39,7 +41,7 @@ class WebDriverManager:
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
+        options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--headless")  # Descomentar para produção
