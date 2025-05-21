@@ -8,18 +8,21 @@ from src.database.schemas import SearchRo
 load_dotenv()
 
 DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URI")
-engine = create_engine(DATABASE_URL, connect_args={"options": "-csearch_path=spreed"})
+engine = create_engine(
+    DATABASE_URL, connect_args={"options": "-csearch_path=spreed"}
+)
 Session = sessionmaker(bind=engine)
 
+
 class InjectDataBaseManager:
-    
+
     def __init__(self, file: str) -> None:
         self.file = file
-    
+
     def inject_data_base(self):
         print("Lendo arquivo CSV...")
         df = pd.read_csv(self.file, sep=";", dtype=str, encoding="latin-1")
-        
+
         df = df.where(pd.notnull(df), None)
 
         df["DATA_NASCIMENTO"] = pd.to_datetime(
@@ -58,12 +61,14 @@ class InjectDataBaseManager:
             "EMAIL3": "email3",
             "RENDA": "renda",
             "NOME_MAE": "nome_mae",
-            "NOMENCLATURA_ESCOLARIDADE": "nomenclatura_escolaridade"
+            "NOMENCLATURA_ESCOLARIDADE": "nomenclatura_escolaridade",
         }
 
         df.rename(columns=rename_map, inplace=True)
 
-        valid_columns = set(c.name for c in SearchRo.__table__.columns if c.name != "id")
+        valid_columns = set(
+            c.name for c in SearchRo.__table__.columns if c.name != "id"
+        )
         records = [
             {k: v for k, v in row.items() if k in valid_columns}
             for row in df.to_dict(orient="records")
@@ -75,7 +80,8 @@ class InjectDataBaseManager:
         except Exception as e:
             print("Erro ao inserir dados:", e)
 
+
 if __name__ == "__main__":
-    filepath = "" # file path to csv
+    filepath = ""  # file path to csv
     manager = InjectDataBaseManager(filepath)
     manager.inject_data_base()

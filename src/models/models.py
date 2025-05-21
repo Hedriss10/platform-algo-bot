@@ -1,6 +1,7 @@
 # src/models/models.py
 from pydantic import BaseModel
 
+
 class ServidorSchema(BaseModel):
     nome: str
     matricula: str

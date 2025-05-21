@@ -5,6 +5,7 @@ import logging
 
 load_dotenv()
 
+
 class DatabaseManagerPostgreSQL:
     # TODO - verificar o cpf_raw, e ve oque está acontecendo por que não ta inserindo a lista de resultados
     def __init__(self):
@@ -40,7 +41,10 @@ class DatabaseManagerPostgreSQL:
                 """
                 rows = await connection.fetch(query, batch_size)
                 return [
-                    {"cpf_formatado": row["cpf_formatado"], "cpf_raw": row["cpf_raw"]}
+                    {
+                        "cpf_formatado": row["cpf_formatado"],
+                        "cpf_raw": row["cpf_raw"],
+                    }
                     for row in rows
                 ]
         except Exception as e:
@@ -48,7 +52,12 @@ class DatabaseManagerPostgreSQL:
             raise
 
     async def insert_result_search_ro(
-        self, nome, cpf, margem_disponivel, margem_cartao, margem_cartao_beneficio
+        self,
+        nome,
+        cpf,
+        margem_disponivel,
+        margem_cartao,
+        margem_cartao_beneficio,
     ):
         try:
             async with self.pool.acquire() as connection:
@@ -67,7 +76,9 @@ class DatabaseManagerPostgreSQL:
                 )
                 self.logger.info(f"Dados inseridos/atualizados para CPF {cpf}")
         except Exception as e:
-            self.logger.error(f"Erro ao inserir resultado para CPF {cpf}: {str(e)}")
+            self.logger.error(
+                f"Erro ao inserir resultado para CPF {cpf}: {str(e)}"
+            )
             raise
 
     async def insert_has_filter(self, cpf_raw):
@@ -81,7 +92,9 @@ class DatabaseManagerPostgreSQL:
                 await connection.execute(query, cpf_raw)
                 self.logger.info(f"has_filter atualizado para CPF {cpf_raw}")
         except Exception as e:
-            self.logger.error(f"Erro ao atualizar has_filter para CPF {cpf_raw}: {str(e)}")
+            self.logger.error(
+                f"Erro ao atualizar has_filter para CPF {cpf_raw}: {str(e)}"
+            )
             raise
 
     async def get_pending_count(self):

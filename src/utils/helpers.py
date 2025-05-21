@@ -5,9 +5,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from typing import Tuple, Union, Optional, Callable
 
+
 class WaitHelper:
     """Class helper for managing smart waits"""
-    
+
     @staticmethod
     def wait_for(
         driver,
@@ -15,7 +16,7 @@ class WaitHelper:
         timeout: float = 10,
         poll_frequency: float = 0.5,
         ignored_exceptions: tuple = None,
-        message: str = ""
+        message: str = "",
     ) -> bool:
         """
         Timeout for of condition possibly with message
@@ -38,13 +39,13 @@ class WaitHelper:
             driver,
             timeout=timeout,
             poll_frequency=poll_frequency,
-            ignored_exceptions=ignored_exceptions
+            ignored_exceptions=ignored_exceptions,
         )
-        
+
         if isinstance(condition, tuple) and len(condition) == 2:
             by, locator = condition
             condition = EC.presence_of_element_located((by, locator))
-        
+
         return wait.until(condition, message=message)
 
     @staticmethod
@@ -54,7 +55,7 @@ class WaitHelper:
         locator: str,
         timeout: float = 10,
         visible: bool = False,
-        clickable: bool = False
+        clickable: bool = False,
     ):
         """
         Wait for a specific element
@@ -67,47 +68,50 @@ class WaitHelper:
             clickable: If True, wait for clickable element
         """
         condition = EC.presence_of_element_located((by, locator))
-        
+
         if visible:
             condition = EC.visibility_of_element_located((by, locator))
         if clickable:
             condition = EC.element_to_be_clickable((by, locator))
-            
+
         return WaitHelper.wait_for(driver, (by, locator), timeout=timeout)
-    
+
     @staticmethod
     def wait_for_elements(
         driver,
         by: str,
         locator: str,
         timeout: float = 10,
-        visible: bool = False
+        visible: bool = False,
     ):
         condition = EC.presence_of_all_elements_located((by, locator))
-        
+
         if visible:
             condition = EC.visibility_of_any_elements_located((by, locator))
-            
+
         return WaitHelper.wait_for(driver, condition, timeout=timeout)
 
     @staticmethod
     def wait_for_page_load(driver, timeout: float = 30):
         def page_loaded(drv):
-            return drv.execute_script("return document.readyState") == "complete"
-        
-        WaitHelper.wait_for(driver, page_loaded, timeout=timeout, 
-                          message="Timeout ao carregar a página")
+            return (
+                drv.execute_script("return document.readyState") == "complete"
+            )
+
+        WaitHelper.wait_for(
+            driver,
+            page_loaded,
+            timeout=timeout,
+            message="Timeout ao carregar a página",
+        )
 
     @staticmethod
     def wait_for_element_disappear(
-        driver,
-        by: str,
-        locator: str,
-        timeout: float = 10
+        driver, by: str, locator: str, timeout: float = 10
     ):
         """Espera até que um elemento desapareça"""
         WaitHelper.wait_for(
             driver,
             EC.invisibility_of_element_located((by, locator)),
-            timeout=timeout
+            timeout=timeout,
         )
