@@ -4,10 +4,12 @@ import os
 from typing import Dict
 
 from dotenv import load_dotenv
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -26,9 +28,6 @@ USERNAME_RO = os.getenv("USERNAME_RO")
 PASSWORD_RO = os.getenv("PASSWORD_RO")
 
 
-TIMEOUT = 5
-
-
 logger = setup_logger()
 driver_logger = LoggerWebDriverManager(logger=logger)
 
@@ -43,7 +42,7 @@ class WebDriverManager:
         options.add_argument("--no-sandbox")
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--disable-dev-shm-usage")
-        # options.add_argument("--headless")  # Descomentar para produção
+        options.add_argument("--headless")  # Descomentar para produção
 
         self.driver = Chrome(options=options)
         self.driver.set_page_load_timeout(30)
@@ -108,7 +107,7 @@ class PageObject(WebDriverManager):
         try:
             element = parent.find_element(By.CSS_SELECTOR, css_selector)
             return element.text
-        except NoSuchElementException:
+        except:
             return ""
 
     def _get_text_after_label(self, parent, label_text: str) -> str:
@@ -116,7 +115,7 @@ class PageObject(WebDriverManager):
             xpath = f".//span[contains(@class, 'text-bold') and contains(text(), '{label_text}')]/following-sibling::text()"
             text_node = parent.find_element(By.XPATH, xpath)
             return text_node
-        except NoSuchElementException:
+        except:
             return ""
 
     def _get_badge_value(self, parent, label_text: str) -> str:
@@ -152,24 +151,27 @@ class PageObject(WebDriverManager):
 
     def click_search_employe(self):
         try:
-            driver_logger.logger.info("Click button search employe")
             button = WaitHelper.wait_for_element(
                 self.driver,
                 By.XPATH,
                 '//button[.//span[contains(., "Buscar Servidor")]]',
-                timeout=5,
+                clickable=True,
+                timeout=15,  # Increased timeout
+            )
+            WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(., "Buscar Servidor")]]')),
+                "Search button not clickable"
             )
             button.click()
-        except TimeoutException:
-            button = WaitHelper.wait_for_element(
-                self.driver,
-                By.XPATH,
-                '//button[.//span[contains(., "Buscar Servidor")]]',
-                timeout=5,
-            )
-            button.click()
+            driver_logger.logger.info("Click button search employe successful")
+        except TimeoutException as te:
+            driver_logger.logger.error(f"Timeout error clicking search button: {str(te)}")
+            raise
+        except WebDriverException as wde:
+            driver_logger.logger.error(f"WebDriver error clicking search button: {str(wde)}")
+            raise
         except Exception as e:
-            driver_logger.logger.error(f"Error click button: {str(e)}")
+            driver_logger.logger.error(f"Unexpected error clicking search button: {str(e)}")
             raise
 
     def search_table(self, db_session: Session):
@@ -180,7 +182,7 @@ class PageObject(WebDriverManager):
                 self.driver,
                 By.CSS_SELECTOR,
                 "div.q-card__section.q-card__section--vert",
-                timeout=5,
+                timeout=10,
             )
 
             raw_data = self.extract_server_data(card)
@@ -216,58 +218,67 @@ class PageObject(WebDriverManager):
             driver_logger.logger.error(f"Error search_table: {str(e)}")
             raise
 
-    def fill_form_fields(
-        self, cpf: str, matricula: str = "", employee_pensioner: str = "N"
-    ) -> bool:
+    def fill_form_fields(self, cpf: str, matricula: str = "", employee_pensioner: str = "N") -> bool:
         try:
-            driver_logger.logger.info(
-                f"Iniciando preenchimento para CPF: {cpf}"
+            driver_logger.logger.info(f"Iniciando preenchimento para CPF: {cpf}")
+            self.driver.get(URL_CONSULT)
+            
+            WebDriverWait(self.driver, 20).until(
+                lambda d: d.execute_script("return document.readyState") == "complete",
+                f"Page {URL_CONSULT} did not load completely for CPF {cpf}"
             )
 
-            self.driver.get(URL_CONSULT)
-            WaitHelper.wait_for_page_load(self.driver, timeout=10)
-
+            # Wait for the CPF input field to be visible and clickable
             cpf_field = WaitHelper.wait_for_element(
                 self.driver,
                 By.CSS_SELECTOR,
                 'input[name="cpf"]',
                 visible=True,
                 clickable=True,
-                timeout=5,
+                timeout=20,  # Increased timeout
             )
 
+            # Ensure the field is interactable before clearing and sending keys
+            WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="cpf"]')),
+                f"CPF field not clickable for CPF {cpf}"
+            )
             self.driver.execute_script(
                 "arguments[0].scrollIntoView({block: 'center'});", cpf_field
             )
             cpf_field.clear()
             cpf_field.send_keys(cpf)
             driver_logger.logger.info(f"CPF {cpf} inserido no formulário")
+
+            # Ensure the search button is clickable before clicking
             self.click_search_employe()
 
+            # Wait for either a notification or the modal/table to appear
             try:
                 notification = WaitHelper.wait_for_element(
                     self.driver,
                     By.XPATH,
-                    locator='//div[contains(@class, "q-notification__message") \
-                        and contains(., "Nenhum servidor encontrado")]',
-                    timeout=5,
+                    '//div[contains(@class, "q-notification__message") and contains(., "Nenhum servidor encontrado")]',
+                    timeout=10,
                 )
                 driver_logger.logger.warning(f"CPF {cpf} not found")
                 return False
 
             except TimeoutException:
-                # Check modal exists
-                modal_process = self.modal_exists_table()
-                if modal_process or not modal_process:
-                    driver_logger.logger.info("Continue with form filling")
-                    return True
-                driver_logger.logger.info(f"CPF {cpf} insert forms")
+                # Wait for the loading spinner to disappear, if present
                 WaitHelper.wait_for_element_disappear(
                     self.driver,
                     By.CSS_SELECTOR,
                     "div.loading-spinner",
-                    timeout=5,
+                    timeout=15,
                 )
+
+                modal_process = self.modal_exists_table()
+                if modal_process or not modal_process:
+                    driver_logger.logger.info("Continue with form filling")
+                    return True
+
+                driver_logger.logger.info(f"CPF {cpf} insert forms")
 
                 if matricula:
                     matricula_field = WaitHelper.wait_for_element(
@@ -275,13 +286,15 @@ class PageObject(WebDriverManager):
                         By.CSS_SELECTOR,
                         'input[name="matricula"]',
                         visible=True,
-                        timeout=7,
+                        timeout=10,
+                    )
+                    WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="matricula"]')),
+                        f"Matricula field not clickable for CPF {cpf}"
                     )
                     matricula_field.clear()
                     matricula_field.send_keys(matricula)
-                    driver_logger.logger.info(
-                        f"Matrícula {matricula} inserida"
-                    )
+                    driver_logger.logger.info(f"Matrícula {matricula} inserida")
 
                 if employee_pensioner == "S":
                     pensionista_checkbox = WaitHelper.wait_for_element(
@@ -289,17 +302,25 @@ class PageObject(WebDriverManager):
                         By.CSS_SELECTOR,
                         'input[name="pensionista"]',
                         clickable=True,
-                        timeout=8,
+                        timeout=10,
+                    )
+                    WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="pensionista"]')),
+                        f"Pensionista checkbox not clickable for CPF {cpf}"
                     )
                     pensionista_checkbox.click()
                     driver_logger.logger.info("Options selected `Pensionista`")
 
                 return True
 
+        except TimeoutException as te:
+            driver_logger.logger.error(f"Timeout error processing CPF {cpf}: {str(te)}")
+            raise
+        except WebDriverException as wde:
+            driver_logger.logger.error(f"WebDriver error processing CPF {cpf}: {str(wde)}")
+            raise
         except Exception as e:
-            driver_logger.logger.error(
-                f"Erro ao processar CPF {cpf}: {str(e)}"
-            )
+            driver_logger.logger.error(f"Unexpected error processing CPF {cpf}: {str(e)}")
             raise
 
     def modal_exists_table(self) -> bool:
@@ -310,7 +331,7 @@ class PageObject(WebDriverManager):
 
             try:
                 modal = WaitHelper.wait_for_element(
-                    self.driver, By.CSS_SELECTOR, "div.q-dialog", timeout=5
+                    self.driver, By.CSS_SELECTOR, "div.q-dialog", timeout=10
                 )
                 if not modal:
                     driver_logger.logger.info(
@@ -372,7 +393,7 @@ class PageObject(WebDriverManager):
                             By.XPATH,
                             '//button[.//span[contains(@class, "block") and contains(text(), "Confirmar")]]',
                             clickable=True,
-                            timeout=5,
+                            timeout=10,
                         )
 
                         # Método alternativo de clique que funciona melhor com elementos Vue/Quasar

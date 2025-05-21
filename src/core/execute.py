@@ -1,10 +1,17 @@
 # src/core/executer.py
 
+import time
+import os
+from dotenv import load_dotenv
 from sqlalchemy import case, func, select, update
-
 from src.core.scraper import PageObject
 from src.database.schemas import SearchRo, SessionLocal
 from src.log.logger import LoggerWebDriverManager, setup_logger
+
+load_dotenv()
+
+URL_CONSULT = os.getenv("URL_CONSULT")
+
 
 logger = setup_logger()
 driver_logger = LoggerWebDriverManager(logger=logger)
@@ -73,23 +80,22 @@ class ScrapePoolExecute:
 
     def scrpaer_pool(self):
         try:
-            # instance db
             db_session = SessionLocal()
-
             cpfs = self.colect_cpfs().split(";")
             for i, cpf in enumerate(cpfs):
+                driver_logger.logger.info(f"Processing CPF {i+1}/{len(cpfs)}: {cpf}")
                 if self.page_objects.fill_form_fields(cpf):
+                    time.sleep(2)
                     self.page_objects.search_table(db_session)
                     self.update_has_filter_cpf(cpf)
                     self.page_objects.driver.refresh()
+                    self.page_objects.driver.get(URL_CONSULT)
                 else:
                     self.page_objects.driver.refresh()
 
             driver_logger.logger.info("Scraping completed")
         except Exception as e:
-            driver_logger.logger.error(
-                f"Error scrpaer_pool with cpfs: {str(e)}"
-            )
+            driver_logger.logger.error(f"Error scrpaer_pool with cpfs: {str(e)}")
             raise
 
     def run(self):
