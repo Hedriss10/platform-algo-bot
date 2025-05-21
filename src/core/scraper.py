@@ -32,10 +32,10 @@ PASSWORD_RO = os.getenv("PASSWORD_RO")
 logger = setup_logger()
 driver_logger = LoggerWebDriverManager(logger=logger)
 
-user_data_dir = tempfile.mkdtemp()
 
 class WebDriverManager:
     def __init__(self):
+        user_data_dir = tempfile.mkdtemp()
         options = Options()
         options.add_argument("--start-maximized")
         options.add_argument("--disable-infobars")
