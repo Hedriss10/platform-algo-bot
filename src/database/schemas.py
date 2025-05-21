@@ -2,16 +2,21 @@ import os
 
 from dotenv import load_dotenv
 from sqlalchemy.orm import mapped_column , Mapped, DeclarativeBase
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URI")
 
-
 class Base(DeclarativeBase):
     pass
+
+
+engine = create_engine(DATABASE_URL, connect_args={"options": "-csearch_path=spreed"})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 
 class SearchRo(Base):
@@ -46,6 +51,7 @@ class SearchRo(Base):
     renda: Mapped[str] = mapped_column(String(100))  
     nome_mae: Mapped[str] = mapped_column(String(255))
     nomenclatura_escolaridade: Mapped[str] = mapped_column(String(100))
+    has_filter: Mapped[bool] = mapped_column(Boolean, default=False)
     
     
     def __repr__(self):
@@ -57,7 +63,7 @@ class ResultSearchRo(Base):
     __table_args__ = {'schema': 'spreed'}
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(225))
+    nome: Mapped[str] = mapped_column(String(225))
     matricula: Mapped[str] = mapped_column(String(100))
     cpf: Mapped[str] = mapped_column(String(30))
     cargo: Mapped[str] = mapped_column(String(225))

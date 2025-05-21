@@ -1,0 +1,91 @@
+# src/core/executer.py
+
+from sqlalchemy import select, func, literal_column, update, case
+from src.database.schemas import SessionLocal, SearchRo
+from src.core.scraper import PageObject
+from src.log.logger import setup_logger, LoggerWebDriverManager
+
+
+logger = setup_logger()
+driver_logger =  LoggerWebDriverManager(logger=logger)
+
+
+class ScrapePoolExecute:
+
+    def __init__(self):
+        self.page_objects = PageObject()
+        driver_logger.register_logger(driver=self.page_objects.driver)
+        self.search_ro = SearchRo
+    
+    
+    def colect_cpfs(self):
+        try:
+            db = SessionLocal()
+            driver_logger.logger.info("Start collecting CPFs from database")
+
+            cpf_col = self.search_ro.cpf
+
+            formatted_cpf = case(
+                (func.length(cpf_col) == 11,
+                func.concat(
+                    func.substr(cpf_col, 1, 3), '.',
+                    func.substr(cpf_col, 4, 3), '.',
+                    func.substr(cpf_col, 7, 3), '-',
+                    func.substr(cpf_col, 10, 2)
+                )),
+                else_=None
+            ).label('cpf')
+
+            stmt = select(formatted_cpf).where(~self.search_ro.has_filter)
+            result_raw = db.execute(stmt).fetchall()
+
+            cpfs = [row[0] for row in result_raw if row[0]]
+            cpfs_str = ";".join(cpfs)
+            return cpfs_str
+
+        except Exception as e:
+            driver_logger.logger.error(f"Error collecting CPFs: {str(e)}")
+            raise
+    
+    def update_has_filter_cpf(self, cpf):
+        try:
+            db = SessionLocal()
+            cpf_str = cpf.replace(".", "").replace("-", "")
+            stmt = update(self.search_ro).where(self.search_ro.cpf == cpf_str).values(has_filter=True)
+            db.execute(stmt)
+            db.commit()
+            driver_logger.logger.info(f"CPF {cpf} has filter updated")
+        except Exception as e:
+            driver_logger.logger.error(f"Error update_has_filter_cpf with cpfs: {str(e)}")
+            raise
+
+    def scrpaer_pool(self):
+        try:
+            # instance db
+            db_session = SessionLocal()
+            
+            cpfs = self.colect_cpfs().split(";")
+            for i, cpf in enumerate(cpfs):
+                if self.page_objects.fill_form_fields(cpf):
+                    self.page_objects.search_table(db_session)
+                    self.update_has_filter_cpf(cpf)
+                    self.page_objects.driver.refresh()
+                else:
+                    self.page_objects.driver.refresh()
+                
+            driver_logger.logger.info("Scraping completed")                
+        except Exception as e:
+            driver_logger.logger.error(f"Error scrpaer_pool with cpfs: {str(e)}")
+            raise
+
+    def run(self):
+        try:
+            self.page_objects.login_gov()
+            self.scrpaer_pool()
+        except Exception as e:
+            driver_logger.logger.error(f"Error scrpaer_pool with cpfs: {str(e)}")
+            raise
+
+if __name__ == "__main__":
+    pool = ScrapePoolExecute()
+    pool.run()

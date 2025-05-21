@@ -1,9 +1,7 @@
 # src/models/models.py
-
 from pydantic import BaseModel
 
-
-class ResultSearchRo(BaseModel):
+class ServidorSchema(BaseModel):
     nome: str
     matricula: str
     cpf: str
