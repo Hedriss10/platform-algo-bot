@@ -1,10 +1,8 @@
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy.orm import mapped_column, Mapped, DeclarativeBase
-from sqlalchemy import Column, Integer, String, Boolean, create_engine
-from sqlalchemy.orm import sessionmaker
-
+from sqlalchemy import Boolean, Integer, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 load_dotenv()
 

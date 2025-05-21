@@ -1,17 +1,19 @@
 # src/core/executer.py
 
-from sqlalchemy import select, func, literal_column, update, case
-from src.database.schemas import SessionLocal, SearchRo
-from src.core.scraper import PageObject
-from src.log.logger import setup_logger, LoggerWebDriverManager
+from sqlalchemy import case, func, select, update
 
+from src.core.scraper import PageObject
+from src.database.schemas import SearchRo, SessionLocal
+from src.log.logger import LoggerWebDriverManager, setup_logger
 
 logger = setup_logger()
 driver_logger = LoggerWebDriverManager(logger=logger)
 
 
-class ScrapePoolExecute:
+MAX_LENGTH = 11
 
+
+class ScrapePoolExecute:
     def __init__(self):
         self.page_objects = PageObject()
         driver_logger.register_logger(driver=self.page_objects.driver)
@@ -26,7 +28,7 @@ class ScrapePoolExecute:
 
             formatted_cpf = case(
                 (
-                    func.length(cpf_col) == 11,
+                    func.length(cpf_col) == MAX_LENGTH,
                     func.concat(
                         func.substr(cpf_col, 1, 3),
                         ".",

@@ -1,9 +1,9 @@
 # src/utils/waitdrivermanager.py
 
-from selenium.webdriver.support.ui import WebDriverWait
+from typing import Callable, Tuple, Union
+
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
-from typing import Tuple, Union, Optional, Callable
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 class WaitHelper:

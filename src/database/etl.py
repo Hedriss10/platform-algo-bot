@@ -1,8 +1,10 @@
 import os
+
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import sessionmaker
+
 from src.database.schemas import SearchRo
 
 load_dotenv()
@@ -15,7 +17,6 @@ Session = sessionmaker(bind=engine)
 
 
 class InjectDataBaseManager:
-
     def __init__(self, file: str) -> None:
         self.file = file
 

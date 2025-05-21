@@ -1,19 +1,20 @@
 # src/core/scraper.py
 
 import os
-
 from typing import Dict
-from sqlalchemy.orm import Session
-from src.database.schemas import ResultSearchRo
-from src.models.models import ServidorSchema
-from sqlalchemy.exc import SQLAlchemyError
+
 from dotenv import load_dotenv
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
-from src.log.logger import setup_logger, LoggerWebDriverManager
+from selenium.webdriver.common.keys import Keys
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from src.database.schemas import ResultSearchRo
+from src.log.logger import LoggerWebDriverManager, setup_logger
+from src.models.models import ServidorSchema
 from src.utils.helpers import WaitHelper
 
 load_dotenv()
@@ -107,7 +108,7 @@ class PageObject(WebDriverManager):
         try:
             element = parent.find_element(By.CSS_SELECTOR, css_selector)
             return element.text
-        except:
+        except NoSuchElementException:
             return ""
 
     def _get_text_after_label(self, parent, label_text: str) -> str:
@@ -115,7 +116,7 @@ class PageObject(WebDriverManager):
             xpath = f".//span[contains(@class, 'text-bold') and contains(text(), '{label_text}')]/following-sibling::text()"
             text_node = parent.find_element(By.XPATH, xpath)
             return text_node
-        except:
+        except NoSuchElementException:
             return ""
 
     def _get_badge_value(self, parent, label_text: str) -> str:
@@ -247,7 +248,8 @@ class PageObject(WebDriverManager):
                 notification = WaitHelper.wait_for_element(
                     self.driver,
                     By.XPATH,
-                    '//div[contains(@class, "q-notification__message") and contains(., "Nenhum servidor encontrado")]',
+                    locator='//div[contains(@class, "q-notification__message") \
+                        and contains(., "Nenhum servidor encontrado")]',
                     timeout=5,
                 )
                 driver_logger.logger.warning(f"CPF {cpf} not found")
@@ -347,7 +349,6 @@ class PageObject(WebDriverManager):
                         .replace(".", "")
                         .isdigit()
                     ):
-
                         svg = row.find_element(
                             By.CSS_SELECTOR, "svg.q-radio__bg"
                         )

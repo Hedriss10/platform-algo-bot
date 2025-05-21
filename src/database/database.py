@@ -1,7 +1,8 @@
+import logging
+import os
+
 import asyncpg
 from dotenv import load_dotenv
-import os
-import logging
 
 load_dotenv()
 
