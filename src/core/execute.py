@@ -5,7 +5,7 @@ import os
 from typing import List, Tuple
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, select, update, text
 from src.core.scraper import PageObject
 from src.database.schemas import SearchRo, SessionLocal
 from src.log.logger import LoggerWebDriverManager, setup_logger
@@ -20,6 +20,7 @@ driver_logger = LoggerWebDriverManager(logger=logger)
 
 
 MAX_LENGTH = 11
+MAX_CPF_TO_PROCESS = 8
 
 class ScrapePoolExecute:
     def __init__(self, username: str, password: str, *args, **kwargs):
@@ -27,39 +28,37 @@ class ScrapePoolExecute:
         driver_logger.register_logger(driver=self.page_objects.driver)
         self.search_ro = SearchRo
 
-    def colect_cpfs(self):
+    def colect_cpfs(self) -> List[str]:
+        db = SessionLocal()
         try:
-            db = SessionLocal()
             driver_logger.logger.info("Start collecting CPFs from database")
 
-            cpf_col = self.search_ro.cpf
+            # bloqueia linhas ainda não processadas nem em uso
+            stmt = text(f"""
+                UPDATE spreed.ro
+                SET is_processing = TRUE
+                WHERE id IN (
+                    SELECT id FROM spreed.ro
+                    WHERE has_filter = FALSE AND (is_processing = FALSE OR is_processing IS NULL)
+                    LIMIT :limit
+                    FOR UPDATE SKIP LOCKED
+                )
+                RETURNING cpf;
+            """)
 
-            formatted_cpf = case(
-                (
-                    func.length(cpf_col) == MAX_LENGTH,
-                    func.concat(
-                        func.substr(cpf_col, 1, 3),
-                        ".",
-                        func.substr(cpf_col, 4, 3),
-                        ".",
-                        func.substr(cpf_col, 7, 3),
-                        "-",
-                        func.substr(cpf_col, 10, 2),
-                    ),
-                ),
-                else_=None,
-            ).label("cpf")
+            result = db.execute(stmt, {"limit": MAX_CPF_TO_PROCESS})
+            db.commit()
 
-            stmt = select(formatted_cpf).where(~self.search_ro.has_filter)
-            result_raw = db.execute(stmt).fetchall()
-
-            cpfs = [row[0] for row in result_raw if row[0]]
-            cpfs_str = ";".join(cpfs)
-            return cpfs_str
+            cpfs_raw = [row[0] for row in result.fetchall()]
+            cpfs = [self._format_cpf(cpf) for cpf in cpfs_raw if cpf]
+            return cpfs
 
         except Exception as e:
             driver_logger.logger.error(f"Error collecting CPFs: {str(e)}")
             raise
+
+        finally:
+            db.close()
 
     def update_has_filter_cpf(self, cpf):
         try:
@@ -81,10 +80,14 @@ class ScrapePoolExecute:
         finally:
             db.close()
 
+
+    def _format_cpf(self, cpf: str) -> str:
+        return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+
     def scrpaer_pool(self):
         try:
             db_session = SessionLocal()
-            cpfs = self.colect_cpfs().split(";")
+            cpfs = self._format_cpf(self.colect_cpfs())
             for i, cpf in enumerate(cpfs):
                 driver_logger.logger.info(f"Processing CPF {i+1}/{len(cpfs)}: {cpf}")
                 if self.page_objects.fill_form_fields(cpf):
