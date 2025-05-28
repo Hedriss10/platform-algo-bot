@@ -3,6 +3,7 @@
 import os
 import tempfile
 import uuid
+import time
 from typing import Dict
 
 from dotenv import load_dotenv
@@ -47,7 +48,7 @@ class WebDriverManager:
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--no-sandbox")
-        options.add_argument("--headless")  # Descomentar em produção
+        # options.add_argument("--headless")  # Descomentar em produção
 
         self.driver = Chrome(options=options)
         self.driver.set_page_load_timeout(30)
@@ -57,8 +58,10 @@ class WebDriverManager:
 
 
 class PageObject(WebDriverManager):
-    def __init__(self):
+    def __init__(self, username: str, password: str):
         super().__init__()
+        self.username = username
+        self.passowrd = password
     
     def extract_server_data(self, card) -> Dict:
         try:
@@ -136,22 +139,26 @@ class PageObject(WebDriverManager):
         if not text:
             return ""
         return " ".join(text.strip().split())
+        
+        
+    def _slow_time(self, seconds: int):
+        time.sleep(seconds)
 
     def login_gov(self):
         try:
             driver_logger.logger.info("Login started")
             self.driver.get(URL_RO)
-            self.create_driver().get(URL_RO)
             user = WaitHelper.wait_for_element(
                 self.driver, By.NAME, locator="usuario", timeout=10
             )
-            user.send_keys(USERNAME_RO)
+            user.send_keys(self.username)
             password = WaitHelper.wait_for_element(
                 self.driver, by=By.NAME, locator="senha", timeout=10
             )
-            password.send_keys(PASSWORD_RO)
+            password.send_keys(self.passowrd)
             password.send_keys(Keys.ENTER)
             driver_logger.logger.info("Login sucefully")
+            self._slow_time(3)
         except Exception as e:
             driver_logger.logger.error(f"Erro no login: {str(e)}")
             raise
@@ -169,6 +176,7 @@ class PageObject(WebDriverManager):
                 EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(., "Buscar Servidor")]]')),
                 "Search button not clickable"
             )
+            self._slow_time(3)
             button.click()
             driver_logger.logger.info("Click button search employe successful")
         except TimeoutException as te:
@@ -191,10 +199,10 @@ class PageObject(WebDriverManager):
                 "div.q-card__section.q-card__section--vert",
                 timeout=10,
             )
-
+            self._slow_time(3)
             raw_data = self.extract_server_data(card)
             validated_data = ServidorSchema(**raw_data).model_dump()
-
+            self._slow_time(3)
             db_record = ResultSearchRo(
                 nome=validated_data["nome"],
                 matricula=validated_data["matricula"],
@@ -208,7 +216,6 @@ class PageObject(WebDriverManager):
                     "margem_cartao_beneficio"
                 ],
             )
-
             try:
                 db_session.add(db_record)
                 db_session.commit()
@@ -229,7 +236,7 @@ class PageObject(WebDriverManager):
         try:
             driver_logger.logger.info(f"Iniciando preenchimento para CPF: {cpf}")
             self.driver.get(URL_CONSULT)
-            
+            self._slow_time(3)
             WebDriverWait(self.driver, 20).until(
                 lambda d: d.execute_script("return document.readyState") == "complete",
                 f"Page {URL_CONSULT} did not load completely for CPF {cpf}"
@@ -244,22 +251,24 @@ class PageObject(WebDriverManager):
                 clickable=True,
                 timeout=20,  # Increased timeout
             )
-
+            self._slow_time(3)
             # Ensure the field is interactable before clearing and sending keys
             WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="cpf"]')),
                 f"CPF field not clickable for CPF {cpf}"
             )
+            self._slow_time(3)
             self.driver.execute_script(
                 "arguments[0].scrollIntoView({block: 'center'});", cpf_field
             )
+            self._slow_time(3)
             cpf_field.clear()
             cpf_field.send_keys(cpf)
             driver_logger.logger.info(f"CPF {cpf} inserido no formulário")
-
+            self._slow_time(3)
             # Ensure the search button is clickable before clicking
             self.click_search_employe()
-
+            self._slow_time(3)
             # Wait for either a notification or the modal/table to appear
             try:
                 notification = WaitHelper.wait_for_element(
@@ -279,7 +288,7 @@ class PageObject(WebDriverManager):
                     "div.loading-spinner",
                     timeout=15,
                 )
-
+                self._slow_time(3)
                 modal_process = self.modal_exists_table()
                 if modal_process or not modal_process:
                     driver_logger.logger.info("Continue with form filling")
@@ -295,11 +304,13 @@ class PageObject(WebDriverManager):
                         visible=True,
                         timeout=10,
                     )
+                    self._slow_time(3)
                     WebDriverWait(self.driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="matricula"]')),
                         f"Matricula field not clickable for CPF {cpf}"
                     )
                     matricula_field.clear()
+                    self._slow_time(3)
                     matricula_field.send_keys(matricula)
                     driver_logger.logger.info(f"Matrícula {matricula} inserida")
 
@@ -311,10 +322,12 @@ class PageObject(WebDriverManager):
                         clickable=True,
                         timeout=10,
                     )
+                    self._slow_time(3)
                     WebDriverWait(self.driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="pensionista"]')),
                         f"Pensionista checkbox not clickable for CPF {cpf}"
                     )
+                    self._slow_time(3)
                     pensionista_checkbox.click()
                     driver_logger.logger.info("Options selected `Pensionista`")
 

@@ -4,6 +4,9 @@
 .data
 data/
 
+## ignore cpfs
+cpfs.txt
+
 
 
 ### CircuitPython ###

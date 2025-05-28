@@ -2,7 +2,9 @@
 
 import time
 import os
+from typing import List, Tuple
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import case, func, select, update
 from src.core.scraper import PageObject
 from src.database.schemas import SearchRo, SessionLocal
@@ -19,10 +21,9 @@ driver_logger = LoggerWebDriverManager(logger=logger)
 
 MAX_LENGTH = 11
 
-
 class ScrapePoolExecute:
-    def __init__(self):
-        self.page_objects = PageObject()
+    def __init__(self, username: str, password: str, *args, **kwargs):
+        self.page_objects = PageObject(username=username, password=password)
         driver_logger.register_logger(driver=self.page_objects.driver)
         self.search_ro = SearchRo
 
@@ -89,8 +90,11 @@ class ScrapePoolExecute:
                 if self.page_objects.fill_form_fields(cpf):
                     time.sleep(2)
                     self.page_objects.search_table(db_session)
+                    time.sleep(2)
                     self.update_has_filter_cpf(cpf)
+                    time.sleep(2)
                     self.page_objects.driver.refresh()
+                    time.sleep(2)
                     self.page_objects.driver.get(URL_CONSULT)
                 else:
                     self.page_objects.driver.refresh()
@@ -112,8 +116,58 @@ class ScrapePoolExecute:
                 f"Error scrpaer_pool with cpfs: {str(e)}"
             )
             raise
-
+        
 
 if __name__ == "__main__":
-    pool = ScrapePoolExecute()
-    pool.run()
+    
+    def parse_cpfs_and_password(file_path: str) -> Tuple[str, List[str]]:
+        try:
+            with open(file_path, "r") as f:
+                lines = [line.strip() for line in f.readlines() if line.strip()]
+
+            header = lines[0]
+            cpf_lines = lines[1:]
+
+            # Extrai a senha
+            password = header.split('PASSWORD:')[1].strip().strip('"')
+
+            # Junta todas as linhas de CPFs, remove duplicados/vazios
+            raw_cpfs = ",".join(cpf_lines).split(",")
+            cpfs = list({cpf.strip() for cpf in raw_cpfs if cpf.strip()})
+
+            return password, cpfs
+
+        except Exception as e:
+            raise ValueError(f"Erro ao ler o arquivo: {str(e)}")
+
+
+    def execute_scraping(cpf: str, password: str):
+        try:
+            print(f"[START] Execute scraping for CPF: {cpf}")
+            pool = ScrapePoolExecute(username=cpf, password=password)
+            pool.run()
+            print(f"[OK] Finished CPF: {cpf}")
+        except Exception as e:
+            print(f"[ERRO] falied for CPF {cpf}: {str(e)}")
+
+
+    def interface(file: str, max_workers: int = 8):
+        try:
+            password, cpfs_list = parse_cpfs_and_password(file)
+
+            print(f"🔐 password unique for cpfs: {password}")
+            print(f"👥 total of CPFs: {len(cpfs_list)} | Threads: {max_workers}")
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(execute_scraping, cpf, password)
+                    for cpf in cpfs_list
+                ]
+                for future in as_completed(futures):
+                    _ = future.result()
+
+        except Exception as e:
+            print(f"[Faied interface] {str(e)}")
+            
+            
+    interface(file="cpfs.txt", max_workers=8)
