@@ -3,6 +3,7 @@
 import time
 import os
 from typing import List, Tuple
+
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import case, func, select, update, text
@@ -23,73 +24,38 @@ MAX_LENGTH = 11
 MAX_CPF_TO_PROCESS = 8
 
 class ScrapePoolExecute:
-    def __init__(self, username: str, password: str, *args, **kwargs):
+    def __init__(self, username: str, password: str, cpfs_to_process: List[str], *args, **kwargs):
         self.page_objects = PageObject(username=username, password=password)
         driver_logger.register_logger(driver=self.page_objects.driver)
-        self.search_ro = SearchRo
+        self.cpfs_to_process = cpfs_to_process
 
-    def colect_cpfs(self) -> List[str]:
-        db = SessionLocal()
-        try:
-            driver_logger.logger.info("Start collecting CPFs from database")
+    def _format_cpf(self, cpf: str) -> str:
+        return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
 
-            # bloqueia linhas ainda não processadas nem em uso
-            stmt = text(f"""
-                UPDATE spreed.ro
-                SET is_processing = TRUE
-                WHERE id IN (
-                    SELECT id FROM spreed.ro
-                    WHERE has_filter = FALSE AND (is_processing = FALSE OR is_processing IS NULL)
-                    LIMIT :limit
-                    FOR UPDATE SKIP LOCKED
-                )
-                RETURNING cpf;
-            """)
-
-            result = db.execute(stmt, {"limit": MAX_CPF_TO_PROCESS})
-            db.commit()
-
-            cpfs_raw = [row[0] for row in result.fetchall()]
-            cpfs = [self._format_cpf(cpf) for cpf in cpfs_raw if cpf]
-            return cpfs
-
-        except Exception as e:
-            driver_logger.logger.error(f"Error collecting CPFs: {str(e)}")
-            raise
-
-        finally:
-            db.close()
-
-    def update_has_filter_cpf(self, cpf):
+    def update_has_filter_cpf(self, cpf: str):
         try:
             db = SessionLocal()
             cpf_str = cpf.replace(".", "").replace("-", "")
             stmt = (
-                update(self.search_ro)
-                .where(self.search_ro.cpf == cpf_str)
+                update(SearchRo)
+                .where(SearchRo.cpf == cpf_str)
                 .values(has_filter=True)
             )
             db.execute(stmt)
             db.commit()
             driver_logger.logger.info(f"CPF {cpf} has filter updated")
         except Exception as e:
-            driver_logger.logger.error(
-                f"Error update_has_filter_cpf with cpfs: {str(e)}"
-            )
+            driver_logger.logger.error(f"Error update_has_filter_cpf with cpf {cpf}: {str(e)}")
             raise
         finally:
             db.close()
 
-
-    def _format_cpf(self, cpf: str) -> str:
-        return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
-
     def scrpaer_pool(self):
+        db_session = SessionLocal()
         try:
-            db_session = SessionLocal()
-            cpfs = self._format_cpf(self.colect_cpfs())
-            for i, cpf in enumerate(cpfs):
-                driver_logger.logger.info(f"Processing CPF {i+1}/{len(cpfs)}: {cpf}")
+            for i, cpf_raw in enumerate(self.cpfs_to_process):
+                cpf = self._format_cpf(cpf_raw)
+                driver_logger.logger.info(f"Processing CPF {i+1}/{len(self.cpfs_to_process)}: {cpf}")
                 if self.page_objects.fill_form_fields(cpf):
                     time.sleep(2)
                     self.page_objects.search_table(db_session)
@@ -106,7 +72,6 @@ class ScrapePoolExecute:
         except Exception as e:
             driver_logger.logger.error(f"Error scrpaer_pool with cpfs: {str(e)}")
             raise
-        
         finally:
             db_session.close()
 
@@ -115,15 +80,13 @@ class ScrapePoolExecute:
             self.page_objects.login_gov()
             self.scrpaer_pool()
         except Exception as e:
-            driver_logger.logger.error(
-                f"Error scrpaer_pool with cpfs: {str(e)}"
-            )
+            driver_logger.logger.error(f"Error running scraping pool: {str(e)}")
             raise
-        
+
 
 if __name__ == "__main__":
-    
-    def parse_cpfs_and_password(file_path: str) -> Tuple[str, List[str]]:
+
+    def parse_cpfs_and_password(file_path: str):
         try:
             with open(file_path, "r") as f:
                 lines = [line.strip() for line in f.readlines() if line.strip()]
@@ -131,46 +94,60 @@ if __name__ == "__main__":
             header = lines[0]
             cpf_lines = lines[1:]
 
-            # Extrai a senha
+            # Extrai a senha única
             password = header.split('PASSWORD:')[1].strip().strip('"')
 
-            # Junta todas as linhas de CPFs, remove duplicados/vazios
-            raw_cpfs = ",".join(cpf_lines).split(",")
-            cpfs = list({cpf.strip() for cpf in raw_cpfs if cpf.strip()})
+            # Usuários (usernames) no arquivo são linhas de CPFs no TXT que logam no CRM
+            usernames = list({cpf.strip() for cpf in cpf_lines if cpf.strip()})
 
-            return password, cpfs
+            return password, usernames
 
         except Exception as e:
             raise ValueError(f"Erro ao ler o arquivo: {str(e)}")
 
+    def chunk_list(lst: List[str], n: int):
+        # Divide a lista lst em pedaços de tamanho n (exceto o último que pode ser menor)
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
 
-    def execute_scraping(cpf: str, password: str):
+    def execute_scraping(username: str, password: str, cpfs_to_process: List[str]):
         try:
-            print(f"[START] Execute scraping for CPF: {cpf}")
-            pool = ScrapePoolExecute(username=cpf, password=password)
+            print(f"[START] Execute scraping for user: {username} | CPFs to process: {len(cpfs_to_process)}")
+            pool = ScrapePoolExecute(username=username, password=password, cpfs_to_process=cpfs_to_process)
             pool.run()
-            print(f"[OK] Finished CPF: {cpf}")
+            print(f"[OK] Finished user: {username}")
         except Exception as e:
-            print(f"[ERRO] falied for CPF {cpf}: {str(e)}")
-
+            print(f"[ERRO] failed for user {username}: {str(e)}")
 
     def interface(file: str, max_workers: int = 8):
         try:
-            password, cpfs_list = parse_cpfs_and_password(file)
+            password, usernames = parse_cpfs_and_password(file)
 
-            print(f"🔐 password unique for cpfs: {password}")
-            print(f"👥 total of CPFs: {len(cpfs_list)} | Threads: {max_workers}")
+            print(f"🔐 Password unique for users: {password}")
+            print(f"👥 Total of users: {len(usernames)} | Threads: {max_workers}")
+
+            # Pega todos os CPFs pendentes no banco (has_filter = False)
+            db = SessionLocal()
+            stmt = select(SearchRo.cpf).where(~SearchRo.has_filter)
+            all_cpfs = [row[0] for row in db.execute(stmt).fetchall()]
+            db.close()
+
+            print(f"📋 Total CPFs to process: {len(all_cpfs)}")
+
+            # Divide os CPFs entre os usuários (agentes)
+            chunk_size = len(all_cpfs) // len(usernames) + 1
+            cpfs_chunks = list(chunk_list(all_cpfs, chunk_size))
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [
-                    executor.submit(execute_scraping, cpf, password)
-                    for cpf in cpfs_list
-                ]
+                futures = []
+                for i, username in enumerate(usernames):
+                    cpfs_for_agent = cpfs_chunks[i] if i < len(cpfs_chunks) else []
+                    futures.append(executor.submit(execute_scraping, username, password, cpfs_for_agent))
+
                 for future in as_completed(futures):
                     _ = future.result()
 
         except Exception as e:
-            print(f"[Faied interface] {str(e)}")
-            
-            
+            print(f"[Failed interface] {str(e)}")
+
     interface(file="cpfs.txt", max_workers=8)

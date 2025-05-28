@@ -27,9 +27,6 @@ load_dotenv()
 
 URL_RO = os.getenv("URL_RO")
 URL_CONSULT = os.getenv("URL_CONSULT")
-USERNAME_RO = os.getenv("USERNAME_RO")
-PASSWORD_RO = os.getenv("PASSWORD_RO")
-
 
 logger = setup_logger()
 driver_logger = LoggerWebDriverManager(logger=logger)
@@ -152,13 +149,14 @@ class PageObject(WebDriverManager):
                 self.driver, By.NAME, locator="usuario", timeout=10
             )
             user.send_keys(self.username)
+            self._slow_time(5)
             password = WaitHelper.wait_for_element(
                 self.driver, by=By.NAME, locator="senha", timeout=10
             )
             password.send_keys(self.passowrd)
             password.send_keys(Keys.ENTER)
             driver_logger.logger.info("Login sucefully")
-            self._slow_time(3)
+            self._slow_time(5)
         except Exception as e:
             driver_logger.logger.error(f"Erro no login: {str(e)}")
             raise
