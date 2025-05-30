@@ -48,7 +48,8 @@ class WebDriverManager:
         options.add_argument("--no-sandbox")
         options.add_argument("--headless")  # Descomentar em produção
 
-        self.driver = Chrome(options=options, service=ChromeService("/usr/local/bin/chromedriver"))
+        self.driver = Chrome(options=options)
+        # service=ChromeService("/usr/local/bin/chromedriver")
         self.driver.set_page_load_timeout(30)
         self.driver.implicitly_wait(15)
         driver_logger.register_logger(driver=self.driver)
