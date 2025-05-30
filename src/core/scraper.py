@@ -7,7 +7,7 @@ import time
 from typing import Dict
 
 from dotenv import load_dotenv
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, ElementClickInterceptedException
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -164,27 +164,46 @@ class PageObject(WebDriverManager):
             raise
 
     def click_search_employe(self):
+        xpath = '//button[.//span[contains(., "Buscar Servidor")]]'
         try:
+            # Espera até o botão estar presente
             button = WaitHelper.wait_for_element(
                 self.driver,
                 By.XPATH,
-                '//button[.//span[contains(., "Buscar Servidor")]]',
+                xpath,
                 clickable=True,
-                timeout=15,  # Increased timeout
+                timeout=15
             )
-            WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(., "Buscar Servidor")]]')),
-                "Search button not clickable"
-            )
-            self._slow_time(10)
-            button.click()
+
+            # Scroll até o botão com JS
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
+
+            # Espera overlay sumir, se existir
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    EC.invisibility_of_element_located((By.CSS_SELECTOR, ".q-scrollarea__content"))
+                )
+            except TimeoutException:
+                driver_logger.logger.warning("Scroll overlay não sumiu, tentando mesmo assim...")
+
+            # Tenta clicar
+            try:
+                self._slow_time(1)  # Reduzi o tempo aqui
+                button.click()
+            except ElementClickInterceptedException:
+                driver_logger.logger.warning("Clique interceptado, tentando forçar com JavaScript...")
+                self.driver.execute_script("arguments[0].click();", button)
+
             driver_logger.logger.info("Click button search employe successful")
+
         except TimeoutException as te:
             driver_logger.logger.error(f"Timeout error clicking search button: {str(te)}")
             raise
+
         except WebDriverException as wde:
             driver_logger.logger.error(f"WebDriver error clicking search button: {str(wde)}")
             raise
+
         except Exception as e:
             driver_logger.logger.error(f"Unexpected error clicking search button: {str(e)}")
             raise
