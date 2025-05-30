@@ -45,7 +45,7 @@ class WebDriverManager:
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--no-sandbox")
-        # options.add_argument("--headless")  # Descomentar em produção
+        options.add_argument("--headless")  # Descomentar em produção
 
         self.driver = Chrome(options=options)
         self.driver.set_page_load_timeout(30)
