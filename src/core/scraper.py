@@ -176,7 +176,7 @@ class PageObject(WebDriverManager):
                 EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(., "Buscar Servidor")]]')),
                 "Search button not clickable"
             )
-            self._slow_time(5)
+            self._slow_time(10)
             button.click()
             driver_logger.logger.info("Click button search employe successful")
         except TimeoutException as te:
@@ -199,10 +199,10 @@ class PageObject(WebDriverManager):
                 "div.q-card__section.q-card__section--vert",
                 timeout=10,
             )
-            self._slow_time(6)
+            self._slow_time(10)
             raw_data = self.extract_server_data(card)
             validated_data = ServidorSchema(**raw_data).model_dump()
-            self._slow_time(6)
+            self._slow_time(10)
             db_record = ResultSearchRo(
                 nome=validated_data["nome"],
                 matricula=validated_data["matricula"],
@@ -236,7 +236,7 @@ class PageObject(WebDriverManager):
         try:
             driver_logger.logger.info(f"Iniciando preenchimento para CPF: {cpf}")
             self.driver.get(URL_CONSULT)
-            self._slow_time(6)
+            self._slow_time(10)
             WebDriverWait(self.driver, 20).until(
                 lambda d: d.execute_script("return document.readyState") == "complete",
                 f"Page {URL_CONSULT} did not load completely for CPF {cpf}"
@@ -251,24 +251,24 @@ class PageObject(WebDriverManager):
                 clickable=True,
                 timeout=20,  # Increased timeout
             )
-            self._slow_time(6)
+            self._slow_time(10)
             # Ensure the field is interactable before clearing and sending keys
             WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="cpf"]')),
                 f"CPF field not clickable for CPF {cpf}"
             )
-            self._slow_time(6)
+            self._slow_time(10)
             self.driver.execute_script(
                 "arguments[0].scrollIntoView({block: 'center'});", cpf_field
             )
-            self._slow_time(6)
+            self._slow_time(10)
             cpf_field.clear()
             cpf_field.send_keys(cpf)
             driver_logger.logger.info(f"CPF {cpf} inserido no formulário")
-            self._slow_time(6)
+            self._slow_time(10)
             # Ensure the search button is clickable before clicking
             self.click_search_employe()
-            self._slow_time(6)
+            self._slow_time(10)
             # Wait for either a notification or the modal/table to appear
             try:
                 notification = WaitHelper.wait_for_element(
@@ -288,7 +288,7 @@ class PageObject(WebDriverManager):
                     "div.loading-spinner",
                     timeout=15,
                 )
-                self._slow_time(6)
+                self._slow_time(10)
                 modal_process = self.modal_exists_table()
                 if modal_process or not modal_process:
                     driver_logger.logger.info("Continue with form filling")
@@ -304,13 +304,13 @@ class PageObject(WebDriverManager):
                         visible=True,
                         timeout=10,
                     )
-                    self._slow_time(6)
+                    self._slow_time(10)
                     WebDriverWait(self.driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="matricula"]')),
                         f"Matricula field not clickable for CPF {cpf}"
                     )
                     matricula_field.clear()
-                    self._slow_time(6)
+                    self._slow_time(10)
                     matricula_field.send_keys(matricula)
                     driver_logger.logger.info(f"Matrícula {matricula} inserida")
 
@@ -322,12 +322,12 @@ class PageObject(WebDriverManager):
                         clickable=True,
                         timeout=10,
                     )
-                    self._slow_time(6)
+                    self._slow_time(10)
                     WebDriverWait(self.driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="pensionista"]')),
                         f"Pensionista checkbox not clickable for CPF {cpf}"
                     )
-                    self._slow_time(6)
+                    self._slow_time(10)
                     pensionista_checkbox.click()
                     driver_logger.logger.info("Options selected `Pensionista`")
 
