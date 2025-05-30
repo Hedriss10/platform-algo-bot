@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.keys import Keys
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -47,7 +48,7 @@ class WebDriverManager:
         options.add_argument("--no-sandbox")
         options.add_argument("--headless")  # Descomentar em produção
 
-        self.driver = Chrome(options=options)
+        self.driver = Chrome(options=options, service=ChromeService("/usr/local/bin/chromedriver"))
         self.driver.set_page_load_timeout(30)
         self.driver.implicitly_wait(15)
         driver_logger.register_logger(driver=self.driver)
