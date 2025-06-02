@@ -29,9 +29,9 @@ class ColoredFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-def setup_logger():
+def setup_logger(name: str = "RoAutomation"):
     """Settings logger"""
-    logger = logging.getLogger("RoAutomation")
+    logger = logging.getLogger(f"{name}")
     logger.setLevel(logging.DEBUG)
 
     if logger.handlers:

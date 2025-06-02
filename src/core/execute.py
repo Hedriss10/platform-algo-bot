@@ -7,7 +7,7 @@ from typing import List, Tuple
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import case, func, select, update, text
-from src.core.scraper import PageObject
+from src.core.scraper_ro import PageObject
 from src.database.schemas import SearchRo, SessionLocal
 from src.log.logger import LoggerWebDriverManager, setup_logger
 
