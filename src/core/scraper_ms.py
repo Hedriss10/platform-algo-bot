@@ -4,6 +4,13 @@ import os
 import tempfile
 import uuid
 import time
+import numpy as np
+import cv2
+import requests
+import pytesseract
+import io
+from io import BytesIO
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 from typing import Dict
 
 from dotenv import load_dotenv
@@ -60,8 +67,70 @@ class PageObject(WebDriverManager):
         super().__init__()
         self.username = username
         self.passowrd = password
-    
-    
+
+    def _convert_captcha(self):
+        try:
+            driver_logger.logger.info("Processing captcha (white background + precise OCR)...")
+            
+            # 1. Capture element screenshot
+            captcha_element = WaitHelper.wait_for_element(
+                self.driver,
+                By.XPATH,
+                locator="//img[@name='captcha_img']",
+                timeout=10,
+            )
+            captcha_screenshot = captcha_element.screenshot_as_png
+            
+            # 2. Convert to OpenCV format
+            img_array = np.frombuffer(captcha_screenshot, np.uint8)
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            
+            # 3. Advanced cleaning with OpenCV
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            # Remove noise while preserving edges
+            denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+            
+            # Adaptive thresholding to handle lighting variations
+            thresh = cv2.adaptiveThreshold(denoised, 255, 
+                                        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                        cv2.THRESH_BINARY_INV, 11, 2)
+            
+            # Morphological operations to remove lines/dots
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
+            cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+            
+            # Invert back to white background with black text
+            final_img = cv2.bitwise_not(cleaned)
+            
+            # 4. Save processed image for debugging
+            cv2.imwrite("captcha_processed_opencv.png", final_img)
+            
+            # 5. OCR with optimized configuration
+            texto_captcha = pytesseract.image_to_string(
+                final_img,
+                config='--psm 8 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+            ).strip()
+            
+            texto_captcha = ''.join(e for e in texto_captcha if e.isalnum()).upper()
+            print("Extracted captcha text:", texto_captcha)
+            
+            # 6. Fill the captcha field
+            campo_captcha = WaitHelper.wait_for_element(
+                self.driver,
+                By.NAME,
+                locator="captcha",
+                timeout=10
+            )
+            campo_captcha.clear()
+            campo_captcha.send_keys(texto_captcha)
+            
+            driver_logger.logger.info("Captcha solved successfully!")
+            
+        except Exception as e:
+            driver_logger.logger.error(f"Failed to process captcha: {str(e)}")
+            raise
+                
     def login(self):
         try:
             driver_logger.logger.info("Login started MS")
@@ -81,6 +150,8 @@ class PageObject(WebDriverManager):
                 self.driver, By.NAME, locator="senha", timeout=10
             )
             password.send_keys(self.passowrd)
+            time.sleep(5)
+            self._convert_captcha()
             time.sleep(10)
 
         except Exception as e:
