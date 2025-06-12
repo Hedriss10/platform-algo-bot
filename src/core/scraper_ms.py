@@ -70,9 +70,9 @@ class PageObject(WebDriverManager):
 
     def _convert_captcha(self):
         try:
-            driver_logger.logger.info("Processing captcha (white background + precise OCR)...")
-            
-            # 1. Capture element screenshot
+            driver_logger.logger.info("Processing captcha (advanced filtering + precise OCR)...")
+
+            # 1. Captura do captcha como imagem
             captcha_element = WaitHelper.wait_for_element(
                 self.driver,
                 By.XPATH,
@@ -80,42 +80,41 @@ class PageObject(WebDriverManager):
                 timeout=10,
             )
             captcha_screenshot = captcha_element.screenshot_as_png
-            
-            # 2. Convert to OpenCV format
+
+            # 2. Converter para imagem OpenCV
             img_array = np.frombuffer(captcha_screenshot, np.uint8)
             img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-            
-            # 3. Advanced cleaning with OpenCV
+
+            # 3. Pré-processamento
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
-            # Remove noise while preserving edges
-            denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
-            
-            # Adaptive thresholding to handle lighting variations
-            thresh = cv2.adaptiveThreshold(denoised, 255, 
-                                        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                        cv2.THRESH_BINARY_INV, 11, 2)
-            
-            # Morphological operations to remove lines/dots
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
-            cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
-            
-            # Invert back to white background with black text
+            denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
+
+            # 4. Binarização adaptativa
+            thresh = cv2.adaptiveThreshold(
+                denoised, 255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY_INV, 11, 2
+            )
+
+            # 5. Remoção de linhas horizontais (interferência)
+            horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
+            detected_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+            cleaned = cv2.subtract(thresh, detected_lines)
+
+            # 6. Inverter imagem (texto preto em fundo branco)
             final_img = cv2.bitwise_not(cleaned)
-            
-            # 4. Save processed image for debugging
-            cv2.imwrite("captcha_processed_opencv.png", final_img)
-            
-            # 5. OCR with optimized configuration
-            texto_captcha = pytesseract.image_to_string(
-                final_img,
-                config='--psm 8 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-            ).strip()
-            
+
+            # 7. Salvar imagem para debug
+            cv2.imwrite("captcha_processed_cleaned.png", final_img)
+
+            # 8. OCR com Tesseract
+            config_tesseract = '--psm 7 --oem 3'
+            texto_captcha = pytesseract.image_to_string(final_img, config=config_tesseract).strip()
             texto_captcha = ''.join(e for e in texto_captcha if e.isalnum()).upper()
-            print("Extracted captcha text:", texto_captcha)
-            
-            # 6. Fill the captcha field
+
+            print("Texto do captcha extraído:", texto_captcha)
+
+            # 9. Preencher campo captcha no formulário
             campo_captcha = WaitHelper.wait_for_element(
                 self.driver,
                 By.NAME,
@@ -124,12 +123,13 @@ class PageObject(WebDriverManager):
             )
             campo_captcha.clear()
             campo_captcha.send_keys(texto_captcha)
-            
-            driver_logger.logger.info("Captcha solved successfully!")
-            
+
+            driver_logger.logger.info("Captcha resolvido com sucesso!")
+
         except Exception as e:
-            driver_logger.logger.error(f"Failed to process captcha: {str(e)}")
+            driver_logger.logger.error(f"Erro ao processar captcha: {str(e)}")
             raise
+
                 
     def login(self):
         try:
@@ -152,7 +152,7 @@ class PageObject(WebDriverManager):
             password.send_keys(self.passowrd)
             time.sleep(5)
             self._convert_captcha()
-            time.sleep(10)
+            time.sleep(30)
 
         except Exception as e:
             driver_logger.logger.error(f"Error login: {str(e)}")
