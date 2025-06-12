@@ -7,7 +7,12 @@ import time
 from typing import Dict
 
 from dotenv import load_dotenv
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, ElementClickInterceptedException
+from selenium.common.exceptions import (
+    TimeoutException, 
+    WebDriverException, 
+    NoSuchElementException, 
+    ElementClickInterceptedException
+)
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
