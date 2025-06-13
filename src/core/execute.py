@@ -57,13 +57,13 @@ class ScrapePoolExecute:
                 cpf = self._format_cpf(cpf_raw)
                 driver_logger.logger.info(f"Processing CPF {i+1}/{len(self.cpfs_to_process)}: {cpf}")
                 if self.page_objects.fill_form_fields(cpf):
-                    time.sleep(2)
+                    time.sleep(1)
                     self.page_objects.search_table(db_session)
-                    time.sleep(2)
+                    time.sleep(1)
                     self.update_has_filter_cpf(cpf)
-                    time.sleep(2)
+                    time.sleep(1)
                     self.page_objects.driver.refresh()
-                    time.sleep(2)
+                    time.sleep(1)
                     self.page_objects.driver.get(URL_CONSULT)
                 else:
                     self.page_objects.driver.refresh()
