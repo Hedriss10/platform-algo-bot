@@ -156,14 +156,14 @@ class PageObject(WebDriverManager):
                 self.driver, By.NAME, locator="usuario", timeout=6
             )
             user.send_keys(self.username)
-            self._slow_time(5)
+            self._slow_time(3)
             password = WaitHelper.wait_for_element(
                 self.driver, by=By.NAME, locator="senha", timeout=6
             )
             password.send_keys(self.passowrd)
             password.send_keys(Keys.ENTER)
             driver_logger.logger.info("Login sucefully")
-            self._slow_time(5)
+            self._slow_time(3)
         except Exception as e:
             driver_logger.logger.error(f"Erro no login: {str(e)}")
             raise
@@ -223,10 +223,10 @@ class PageObject(WebDriverManager):
                 "div.q-card__section.q-card__section--vert",
                 timeout=6,
             )
-            self._slow_time(4)
+            self._slow_time(3)
             raw_data = self.extract_server_data(card)
             validated_data = ServidorSchema(**raw_data).model_dump()
-            self._slow_time(4)
+            self._slow_time(3)
             db_record = ResultSearchRo(
                 nome=validated_data["nome"],
                 matricula=validated_data["matricula"],
@@ -275,24 +275,24 @@ class PageObject(WebDriverManager):
                 clickable=True,
                 timeout=6,  # Increased timeout
             )
-            self._slow_time(4)
+            self._slow_time(3)
             # Ensure the field is interactable before clearing and sending keys
             WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[name="cpf"]')),
                 f"CPF field not clickable for CPF {cpf}"
             )
-            self._slow_time(4)
+            self._slow_time(3)
             self.driver.execute_script(
                 "arguments[0].scrollIntoView({block: 'center'});", cpf_field
             )
-            self._slow_time(4)
+            self._slow_time(3)
             cpf_field.clear()
             cpf_field.send_keys(cpf)
             driver_logger.logger.info(f"CPF {cpf} inserido no formulário")
-            self._slow_time(4)
+            self._slow_time(3)
             # Ensure the search button is clickable before clicking
             self.click_search_employe()
-            self._slow_time(4)
+            self._slow_time(3)
             # Wait for either a notification or the modal/table to appear
             try:
                 notification = WaitHelper.wait_for_element(
