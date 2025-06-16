@@ -42,10 +42,6 @@ class WaitHelper:
             ignored_exceptions=ignored_exceptions,
         )
 
-        if isinstance(condition, tuple) and len(condition) == 2:
-            by, locator = condition
-            condition = EC.presence_of_element_located((by, locator))
-
         return wait.until(condition, message=message)
 
     @staticmethod
@@ -67,14 +63,14 @@ class WaitHelper:
             visible: If True, wait for visible element
             clickable: If True, wait for clickable element
         """
-        condition = EC.presence_of_element_located((by, locator))
-
-        if visible:
-            condition = EC.visibility_of_element_located((by, locator))
         if clickable:
             condition = EC.element_to_be_clickable((by, locator))
+        elif visible:
+            condition = EC.visibility_of_element_located((by, locator))
+        else:
+            condition = EC.presence_of_element_located((by, locator))
 
-        return WaitHelper.wait_for(driver, (by, locator), timeout=timeout)
+        return WaitHelper.wait_for(driver, condition, timeout=timeout)
 
     @staticmethod
     def wait_for_elements(
