@@ -25,9 +25,7 @@ from selenium.webdriver.common.keys import Keys
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from src.database.schemas import ResultSearchRo
 from src.log.logger import LoggerWebDriverManager, setup_logger
-from src.models.models import ServidorSchema
 from src.utils.helpers import WaitHelper
 
 load_dotenv()
