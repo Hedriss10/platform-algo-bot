@@ -1,0 +1,598 @@
+# # src/core/scraper.py
+
+# import os
+# import tempfile
+# import uuid
+# import time
+# import traceback
+# from typing import Dict
+
+# from dotenv import load_dotenv
+# from selenium.common.exceptions import (
+#     TimeoutException,
+#     WebDriverException,
+#     NoSuchElementException,
+#     ElementClickInterceptedException,
+# )
+# from selenium.webdriver import Chrome
+# from selenium.webdriver.chrome.options import Options
+# from selenium.webdriver.common.by import By
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions as EC
+# from selenium.webdriver.common.action_chains import ActionChains
+# from selenium.webdriver.chrome.service import Service as ChromeService
+# from selenium.webdriver.common.keys import Keys
+# from sqlalchemy.exc import SQLAlchemyError
+# from sqlalchemy.orm import Session
+
+# from src.database.schemas import ResultSearchRo
+# from src.log.logger import LoggerWebDriverManager, setup_logger
+# from src.models.ro import ServidorSchema
+# from src.utils.helpers import WaitHelper
+
+# load_dotenv()
+
+
+# URL_RO = os.getenv("URL_RO")
+# URL_CONSULT = os.getenv("URL_CONSULT")
+
+
+# logger = setup_logger()
+# driver_logger = LoggerWebDriverManager(logger=logger)
+
+
+# class WebDriverManager:
+#     def __init__(self):
+#         user_data_dir = tempfile.mkdtemp(prefix=f"selenium_{uuid.uuid4()}_")
+#         options = Options()
+#         options.add_argument("--start-maximized")
+#         options.add_argument("--disable-infobars")
+#         options.add_argument("--disable-extensions")
+#         options.add_argument("--disable-gpu")
+#         options.add_argument(f"--user-data-dir={user_data_dir}")
+#         options.add_argument("--ignore-certificate-errors")
+#         options.add_argument("--disable-dev-shm-usage")
+#         options.add_argument("--no-sandbox")
+#         # options.add_argument("--headless")  # Descomentar em produção
+
+#         self.driver = Chrome(options=options)
+#         # service=ChromeService("/usr/local/bin/chromedriver")
+#         self.driver.set_page_load_timeout(10)
+#         self.driver.implicitly_wait(15)
+#         driver_logger.register_logger(driver=self.driver)
+
+
+# class PageObject(WebDriverManager):
+#     def __init__(self, username: str, password: str):
+#         super().__init__()
+#         self.username = username
+#         self.passowrd = password
+
+#     # def extract_server_data(self, card) -> Dict:
+#     #     try:
+#     #         card = WaitHelper.wait_for_element(
+#     #             self.driver,
+#     #             By.CSS_SELECTOR,
+#     #             "div.q-card__section.q-card__section--vert",
+#     #             timeout=5,
+#     #         )
+
+#     #         data = {
+#     #             "nome": self._clean_text(
+#     #                 self._get_element_text(
+#     #                     card, "div.col-xs-12.text-bold span.text-weight-bold"
+#     #                 )
+#     #             ),
+#     #             "matricula": self._clean_text(
+#     #                 self._get_text_after_label(card, "Matrícula:")
+#     #             ),
+#     #             "cpf": self._clean_text(
+#     #                 self._get_text_after_label(card, "CPF:")
+#     #             ),
+#     #             "cargo": self._clean_text(
+#     #                 self._get_text_after_label(card, "Cargo:")
+#     #             ),
+#     #             "lotacao": self._clean_text(
+#     #                 self._get_text_after_label(card, "Lotação:")
+#     #             ),
+#     #             "classificacao": self._clean_text(
+#     #                 self._get_text_after_label(card, "Classificação:")
+#     #             ),
+#     #             "margem_disponivel": self._clean_text(
+#     #                 self._get_badge_value(card, "Margem Disponível:")
+#     #             ),
+#     #             "margem_cartao": self._clean_text(
+#     #                 self._get_badge_value(card, "Margem Cartão:")
+#     #             ),
+#     #             "margem_cartao_beneficio": self._clean_text(
+#     #                 self._get_badge_value(card, "Margem Cartão Benefício:")
+#     #             ),
+#     #         }
+#     #         print("DATA COLETADA COM SUCESSO", data)
+#     #         driver_logger.logger.info("Data extract success")
+#     #         return data
+
+#     #     except Exception as e:
+#     #         driver_logger.logger.error(
+#     #             f"Error is processing extract_server_data: {str(e)}"
+#     #         )
+#     #         raise
+
+#     def _get_text_after_label(self, parent_element, label_text):
+#         """Extrai o texto após um rótulo específico (ex: 'Matrícula:', 'CPF:')."""
+#         try:
+#             label_element = parent_element.find_element(
+#                 By.XPATH,
+#                 f".//span[contains(@class, 'text-bold') and contains(text(), '{label_text}')]",
+#             )
+#             full_text = label_element.find_element(By.XPATH, "./..").text
+#             return full_text.replace(label_text, "").strip()
+#         except Exception as e:
+#             driver_logger.logger.warning(
+#                 f"Rótulo '{label_text}' não encontrado: {str(e)}"
+#             )
+#             return ""
+
+#     def _get_badge_value(self, parent_element, label_text):
+#         """Extrai valores de badges (ex: 'Margem Disponível:')."""
+#         try:
+#             badge = parent_element.find_element(
+#                 By.XPATH,
+#                 f".//span[contains(@class, 'text-bold') and contains(text(), '{label_text}')]/following-sibling::div[contains(@class, 'q-badge')]",
+#             )
+#             return badge.text.strip()
+#         except Exception as e:
+#             driver_logger.logger.warning(
+#                 f"Badge para '{label_text}' não encontrada: {str(e)}"
+#             )
+#             return ""
+
+#     def extract_server_data(self, card) -> Dict:
+#         """Extrai todos os dados do servidor (nome, matrícula, CPF, margens, etc.)."""
+#         try:
+#             card = WaitHelper.wait_for_element(
+#                 self.driver,
+#                 By.CSS_SELECTOR,
+#                 "div.q-card__section.q-card__section--vert",
+#                 timeout=5,
+#             )
+
+#             data = {
+#                 "nome": self._clean_text(
+#                     card.find_element(
+#                         By.CSS_SELECTOR,
+#                         "div.col-xs-12.text-bold span.text-weight-bold",
+#                     ).text
+#                 ),
+#                 "matricula": self._clean_text(
+#                     self._get_text_after_label(card, "Matrícula:")
+#                 ),
+#                 "cpf": self._clean_text(
+#                     self._get_text_after_label(card, "CPF:")
+#                 ),
+#                 "cargo": self._clean_text(
+#                     self._get_text_after_label(card, "Cargo:")
+#                 ),
+#                 "lotacao": self._clean_text(
+#                     self._get_text_after_label(card, "Lotação:")
+#                 ),
+#                 "classificacao": self._clean_text(
+#                     self._get_text_after_label(card, "Classificação:")
+#                 ),
+#                 "margem_disponivel": self._clean_text(
+#                     self._get_badge_value(card, "Margem Disponível:")
+#                 ),
+#                 "margem_cartao": self._clean_text(
+#                     self._get_badge_value(card, "Margem Cartão:")
+#                 ),
+#                 "margem_cartao_beneficio": self._clean_text(
+#                     self._get_badge_value(card, "Margem Cartão Benefício:")
+#                 ),
+#             }
+
+#             print("DADOS COLETADOS COM SUCESSO:", data)
+#             driver_logger.logger.info("Extração de dados concluída")
+#             return data
+
+#         except Exception as e:
+#             driver_logger.logger.error(f"Falha na extração de dados: {str(e)}")
+#             raise
+
+#     def _get_element_text(self, parent, css_selector: str) -> str:
+#         try:
+#             element = parent.find_element(By.CSS_SELECTOR, css_selector)
+#             return element.text
+#         except:
+#             return ""
+
+#     def _get_text_after_label(self, parent, label_text: str) -> str:
+#         try:
+#             xpath = f".//span[contains(@class, 'text-bold') and contains(text(), '{label_text}')]/following-sibling::text()"
+#             text_node = parent.find_element(By.XPATH, xpath)
+#             return text_node
+#         except:
+#             return ""
+
+#     def _get_badge_value(self, parent, label_text: str) -> str:
+#         try:
+#             xpath = f".//span[contains(@class, 'text-bold') and contains(text(), '{label_text}')]/following-sibling::div[contains(@class, 'q-badge')]"
+#             badge = parent.find_element(By.XPATH, xpath)
+#             return badge.text
+#         except:
+#             return ""
+
+#     def _clean_text(self, text: str) -> str:
+#         if not text:
+#             return ""
+#         return " ".join(text.strip().split())
+
+#     def _slow_time(self, seconds: int):
+#         time.sleep(seconds)
+
+#     def login_gov(self):
+#         try:
+#             driver_logger.logger.info("Login started")
+#             self.driver.get(URL_RO)
+#             user = WaitHelper.wait_for_element(
+#                 self.driver,
+#                 By.NAME,
+#                 locator="usuario",
+#                 timeout=6,
+#                 visible=True,
+#             )
+#             user.send_keys(self.username)
+#             self._slow_time(3)
+#             password = WaitHelper.wait_for_element(
+#                 self.driver,
+#                 by=By.NAME,
+#                 locator="senha",
+#                 timeout=6,
+#                 visible=True,
+#             )
+#             password.send_keys(self.passowrd)
+#             password.send_keys(Keys.ENTER)
+#             driver_logger.logger.info("Login sucefully")
+#             self._slow_time(3)
+#         except Exception as e:
+#             driver_logger.logger.error(
+#                 f"Erro no login: {e.__class__.__name__}: {str(e)}"
+#             )
+#             driver_logger.logger.debug(traceback.format_exc())
+#             raise
+
+#     def click_search_employe(self):
+#         xpath = '//button[.//span[contains(., "Buscar Servidor")]]'
+#         try:
+#             # Espera até o botão estar presente
+#             button = WaitHelper.wait_for_element(
+#                 self.driver, By.XPATH, xpath, clickable=True, timeout=5
+#             )
+
+#             # Scroll até o botão com JS
+#             self.driver.execute_script(
+#                 "arguments[0].scrollIntoView({block: 'center'});", button
+#             )
+
+#             # Espera overlay sumir, se existir
+#             try:
+#                 WebDriverWait(self.driver, 5).until(
+#                     EC.invisibility_of_element_located(
+#                         (By.CSS_SELECTOR, ".q-scrollarea__content")
+#                     )
+#                 )
+#             except TimeoutException:
+#                 driver_logger.logger.warning("Scroll overlay check...")
+
+#             # Tenta clicar
+#             try:
+#                 button.click()
+#             except ElementClickInterceptedException:
+#                 driver_logger.logger.warning(
+#                     "Clique interceptado, tentando forçar com JavaScript..."
+#                 )
+#                 self.driver.execute_script("arguments[0].click();", button)
+
+#             driver_logger.logger.info("Click button search employe successful")
+
+#         except TimeoutException as te:
+#             driver_logger.logger.error(
+#                 f"Timeout error clicking search button: {str(te)}"
+#             )
+#             raise
+
+#         except WebDriverException as wde:
+#             driver_logger.logger.error(
+#                 f"WebDriver error clicking search button: {str(wde)}"
+#             )
+#             raise
+
+#         except Exception as e:
+#             driver_logger.logger.error(
+#                 f"Unexpected error clicking search button: {str(e)}"
+#             )
+#             raise
+
+#     def search_table(self, db_session: Session):
+#         try:
+#             driver_logger.logger.info("Start collect data in table")
+#             card = WaitHelper.wait_for_element(
+#                 self.driver,
+#                 By.CSS_SELECTOR,
+#                 "div.q-card__section.q-card__section--vert",
+#                 timeout=6,
+#             )
+#             raw_data = self.extract_server_data(card)
+#             validated_data = ServidorSchema(**raw_data).model_dump()
+#             print(validated_data, "validando a data coletada")
+#             db_record = ResultSearchRo(
+#                 nome=validated_data["nome"],
+#                 matricula=validated_data["matricula"],
+#                 cpf=validated_data["cpf"],
+#                 cargo=validated_data["cargo"],
+#                 lotacao=validated_data["lotacao"],
+#                 classificacao=validated_data["classificacao"],
+#                 margem_disponivel=validated_data["margem_disponivel"],
+#                 margem_cartao=validated_data["margem_cartao"],
+#                 margem_cartao_beneficio=validated_data[
+#                     "margem_cartao_beneficio"
+#                 ],
+#             )
+
+#             try:
+#                 db_session.add(db_record)
+#                 db_session.commit()
+#                 driver_logger.logger.info(
+#                     f"CPF insert success: ID {db_record.id}"
+#                 )
+#                 return db_record
+#             except SQLAlchemyError as e:
+#                 db_session.rollback()
+#                 driver_logger.logger.error(f"Error save in database: {str(e)}")
+#                 raise
+
+#         except Exception as e:
+#             driver_logger.logger.error(f"Error search_table: {str(e)}")
+#             raise
+
+#     def fill_form_fields(
+#         self, cpf: str, matricula: str = "", employee_pensioner: str = "N"
+#     ) -> bool:
+#         try:
+#             driver_logger.logger.info(f"Forms fileds cpf: {cpf}")
+#             self.driver.get(URL_CONSULT)
+#             WaitHelper.wait_for_page_load(self.driver, timeout=5)
+
+#             WebDriverWait(self.driver, 10).until(
+#                 lambda d: d.execute_script("return document.readyState")
+#                 == "complete",
+#                 f"Page {URL_CONSULT} did not load completely for CPF {cpf}",
+#             )
+
+#             # Wait for the CPF input field to be visible and clickable
+#             cpf_field = WaitHelper.wait_for_element(
+#                 self.driver,
+#                 By.CSS_SELECTOR,
+#                 'input[name="cpf"]',
+#                 visible=True,
+#                 clickable=True,
+#                 timeout=6,  # Increased timeout
+#             )
+#             WebDriverWait(self.driver, 10).until(
+#                 EC.element_to_be_clickable(
+#                     (By.CSS_SELECTOR, 'input[name="cpf"]')
+#                 ),
+#                 f"CPF field not clickable for CPF {cpf}",
+#             )
+#             self.driver.execute_script(
+#                 "arguments[0].scrollIntoView({block: 'center'});", cpf_field
+#             )
+#             cpf_field.clear()
+#             cpf_field.send_keys(cpf)
+#             driver_logger.logger.info(f"CPF {cpf} inserido no formulário")
+#             # Ensure the search button is clickable before clicking
+#             self.click_search_employe()
+#             # Wait for either a notification or the modal/table to appear
+#             try:
+#                 notification = WaitHelper.wait_for_element(
+#                     self.driver,
+#                     By.XPATH,
+#                     '//div[contains(@class, "q-notification__message") and contains(., "Nenhum servidor encontrado")]',
+#                     timeout=6,
+#                 )
+#                 driver_logger.logger.warning(f"CPF {cpf} not found")
+#                 return False
+
+#             except TimeoutException:
+#                 # Wait for the loading spinner to disappear, if present
+#                 WaitHelper.wait_for_element_disappear(
+#                     self.driver,
+#                     By.CSS_SELECTOR,
+#                     "div.loading-spinner",
+#                     timeout=10,
+#                 )
+#                 modal_process = self.modal_exists_table()
+#                 if modal_process or not modal_process:
+#                     driver_logger.logger.info("Continue with form filling")
+#                     return True
+
+#                 driver_logger.logger.info(f"CPF {cpf} insert forms")
+
+#                 if matricula:
+#                     matricula_field = WaitHelper.wait_for_element(
+#                         self.driver,
+#                         By.CSS_SELECTOR,
+#                         'input[name="matricula"]',
+#                         visible=True,
+#                         timeout=10,
+#                     )
+#                     WebDriverWait(self.driver, 10).until(
+#                         EC.element_to_be_clickable(
+#                             (By.CSS_SELECTOR, 'input[name="matricula"]')
+#                         ),
+#                         f"Matricula field not clickable for CPF {cpf}",
+#                     )
+#                     matricula_field.clear()
+#                     matricula_field.send_keys(matricula)
+#                     driver_logger.logger.info(
+#                         f"Matrícula {matricula} inserida"
+#                     )
+
+#                 if employee_pensioner == "S":
+#                     pensionista_checkbox = WaitHelper.wait_for_element(
+#                         self.driver,
+#                         By.CSS_SELECTOR,
+#                         'input[name="pensionista"]',
+#                         clickable=True,
+#                         timeout=6,
+#                     )
+#                     WebDriverWait(self.driver, 10).until(
+#                         EC.element_to_be_clickable(
+#                             (By.CSS_SELECTOR, 'input[name="pensionista"]')
+#                         ),
+#                         f"Pensionista checkbox not clickable for CPF {cpf}",
+#                     )
+#                     pensionista_checkbox.click()
+#                     driver_logger.logger.info("Options selected `Pensionista`")
+
+#                 return True
+
+#         except TimeoutException as te:
+#             driver_logger.logger.error(
+#                 f"Timeout error processing CPF {cpf}: {str(te)}"
+#             )
+#             raise
+#         except WebDriverException as wde:
+#             driver_logger.logger.error(
+#                 f"WebDriver error processing CPF {cpf}: {str(wde)}"
+#             )
+#             raise
+#         except Exception as e:
+#             driver_logger.logger.error(
+#                 f"Unexpected error processing CPF {cpf}: {str(e)}"
+#             )
+#             raise
+
+#     def modal_exists_table(self) -> bool:
+#         try:
+#             driver_logger.logger.info(
+#                 "Verificando se modal de seleção aparece"
+#             )
+
+#             try:
+#                 modal = WaitHelper.wait_for_element(
+#                     self.driver, By.CSS_SELECTOR, "div.q-dialog", timeout=6
+#                 )
+#                 if not modal:
+#                     driver_logger.logger.info(
+#                         "Modal não encontrada - CPF único"
+#                     )
+#                     return False
+#             except TimeoutException:
+#                 driver_logger.logger.info("Modal não encontrada - CPF único")
+#                 return False
+
+#             driver_logger.logger.info(
+#                 "Modal de seleção encontrada - processando..."
+#             )
+
+#             rows = WaitHelper.wait_for_elements(
+#                 self.driver,
+#                 By.CSS_SELECTOR,
+#                 "div.q-dialog table tbody tr:not([style*='display: none'])",
+#                 timeout=6,
+#             )
+
+#             for row in rows:
+#                 try:
+#                     margem_disponivel = row.find_element(
+#                         By.XPATH, ".//td[6]"
+#                     ).text.strip()
+#                     margem_cartao = row.find_element(
+#                         By.XPATH, ".//td[7]"
+#                     ).text.strip()
+
+#                     if (
+#                         margem_disponivel.replace(",", "")
+#                         .replace(".", "")
+#                         .isdigit()
+#                         and margem_cartao.replace(",", "")
+#                         .replace(".", "")
+#                         .isdigit()
+#                     ):
+#                         svg = row.find_element(
+#                             By.CSS_SELECTOR, "svg.q-radio__bg"
+#                         )
+#                         self.driver.execute_script(
+#                             """
+#                             arguments[0].dispatchEvent(new MouseEvent('click', {
+#                                 view: window,
+#                                 bubbles: true,
+#                                 cancelable: true
+#                             }));
+#                         """,
+#                             svg,
+#                         )
+
+#                         driver_logger.logger.info(
+#                             f"Servidor selecionado - Margem: {margem_disponivel}, Cartão: {margem_cartao}"
+#                         )
+
+#                         confirm_button = WaitHelper.wait_for_element(
+#                             self.driver,
+#                             By.XPATH,
+#                             '//button[.//span[contains(@class, "block") and contains(text(), "Confirmar")]]',
+#                             clickable=True,
+#                             timeout=6,
+#                         )
+
+#                         # Método alternativo de clique que funciona melhor com elementos Vue/Quasar
+#                         self.driver.execute_script(
+#                             """
+#                             var event = new MouseEvent('click', {
+#                                 'view': window,
+#                                 'bubbles': true,
+#                                 'cancelable': true
+#                             });
+#                             arguments[0].dispatchEvent(event);
+#                         """,
+#                             confirm_button,
+#                         )
+
+#                         driver_logger.logger.info(
+#                             "Button clicked successfully"
+#                         )
+
+#                         WaitHelper.wait_for_element_disappear(
+#                             self.driver,
+#                             By.CSS_SELECTOR,
+#                             "div.q-dialog",
+#                             timeout=6,
+#                         )
+
+#                         return True
+
+#                 except Exception as e:
+#                     driver_logger.logger.warning(
+#                         f"Erro ao processar linha: {str(e)}"
+#                     )
+#                     continue
+
+#             driver_logger.logger.warning("Not server with margin valid found")
+#             return False
+
+#         except Exception as e:
+#             driver_logger.logger.error(f"Erro ao processar modal: {str(e)}")
+#             raise
+
+#     def clean_input_cpf(self):
+#         try:
+#             driver_logger.logger.info("Clean input CPF")
+#             input_cpf = WaitHelper.wait_for_element(
+#                 by=By.CSS_SELECTOR, locator='input[name="cpf"]'
+#             )
+#             self.click_search_employe()
+#             input_cpf.clear()
+#             driver_logger.logger.info("Input CPF clean success")
+#         except Exception as e:
+#             driver_logger.logger.error(f"Error clean_input_cpf: {str(e)}")
+#             raise

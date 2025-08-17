@@ -71,6 +71,10 @@ class ResultSearchRo(Base):
     margem_disponivel: Mapped[str] = mapped_column(String(30))
     margem_cartao: Mapped[str] = mapped_column(String(30))
     margem_cartao_beneficio: Mapped[str] = mapped_column(String(30))
+    nome_cargo: Mapped[str] = mapped_column(String(255))
+    situacao: Mapped[str] = mapped_column(String(255))
+    is_pensionista: Mapped[str] = mapped_column(String(141))
+    list_status: Mapped[bool] = mapped_column(Boolean, default=False)
 
     def __repr__(self):
         return f"Registred result search ro sucessfully: {self.id}"
