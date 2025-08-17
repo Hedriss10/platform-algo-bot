@@ -43,7 +43,7 @@ class WebDriverManager:
         options.add_argument("--no-sandbox")
         # Configuração para capturar logs de rede
         options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
-        # options.add_argument("--headless")  # Descomentar em produção
+        options.add_argument("--headless")  # Descomentar em produção
 
         self.driver = Chrome(options=options)
         self.driver.set_page_load_timeout(10)
